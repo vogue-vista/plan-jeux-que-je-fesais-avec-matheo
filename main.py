@@ -1,4 +1,4 @@
-# main.py (Version Finale avec IA Groq et Anti-Bug Web)
+# main.py (Version Finale avec les 5 Modes de Jeu et IA Groq)
 import streamlit as st
 import random
 from groq import Groq
@@ -32,19 +32,37 @@ def generer_continents_espaces():
         continents.append({"nom": nom, "x": x, "y": y})
     st.session_state.continents = continents
 
-# ---- ÉTAPE 1 : LE MENU PRINCIPAL ----
+# ---- ÉTAPE 1 : LE MENU PRINCIPAL (AVEC LES 5 MODES) ----
 if st.session_state.etape == "MENU_MODE":
     with st.container(key="zone_menu"):
         st.write("### Choisissez le mode de gestion de votre Empire :")
         
-        if st.button("🚀 MODE 5 : COURSE ARMA-SPATIALE (Plutonium & Fusées)", key="btn_menu_mode_5", use_container_width=True):
-            st.session_state.mode = 5
+        if st.button("🎚️ MODE 1 : MODE EXTRÊME (Guerre + Gestion Totale)", key="btn_menu_mode_1", use_container_width=True):
+            st.session_state.mode = 1
+            generer_continents_espaces()
+            st.session_state.etape = "SELECTION_BASE"
+            st.rerun()
+
+        if st.button("⚔️ MODE 2 : MODE GUERRE SEULE (La ville produit de l'Or toute seule)", key="btn_menu_mode_2", use_container_width=True):
+            st.session_state.mode = 2
+            generer_continents_espaces()
+            st.session_state.etape = "SELECTION_BASE"
+            st.rerun()
+
+        if st.button("🏙️ MODE 3 : MODE VILLE SEULE (Gestion et Décrets uniquement, pas de combat)", key="btn_menu_mode_3", use_container_width=True):
+            st.session_state.mode = 3
             generer_continents_espaces()
             st.session_state.etape = "SELECTION_BASE"
             st.rerun()
             
-        if st.button("⚔️ MODE 4 : COMPTEUR PLANÉTAIRE EN DIRECT", key="btn_menu_mode_4", use_container_width=True):
+        if st.button("⏱️ MODE 4 : COMPTEUR PLANÉTAIRE EN DIRECT (Temps Réel)", key="btn_menu_mode_4", use_container_width=True):
             st.session_state.mode = 4
+            generer_continents_espaces()
+            st.session_state.etape = "SELECTION_BASE"
+            st.rerun()
+
+        if st.button("🚀 MODE 5 : COURSE ARMA-SPATIALE (Plutonium & Fusées)", key="btn_menu_mode_5", use_container_width=True):
+            st.session_state.mode = 5
             generer_continents_espaces()
             st.session_state.etape = "SELECTION_BASE"
             st.rerun()
@@ -67,6 +85,11 @@ elif st.session_state.etape == "PARTIE":
         
         with col_carte:
             st.write("### 🌍 Situation Géopolitique")
+            
+            # Affichage du nom du mode actuel
+            noms_modes = {1: "Extrême", 2: "Guerre Seule", 3: "Ville Seule", 4: "Planétaire TR", 5: "Arma-Spatiale"}
+            st.warning(f"Configuration : **Mode {st.session_state.mode} ({noms_modes[st.session_state.mode]})**")
+            
             if st.session_state.base_joueur:
                 st.success(f"Votre Quartier Général (QG) est basé en : **{st.session_state.base_joueur['nom']}**")
             
@@ -98,11 +121,15 @@ elif st.session_state.etape == "PARTIE":
             st.write("---")
             st.write("#### Actions d'État")
             
-            if st.button("Acheter un Tank de combat (45 Or)", key="btn_action_tank", use_container_width=True):
-                if st.session_state.argent >= 45:
-                    st.session_state.argent -= 45
-                    st.session_state.unites.append({"type": "Tank v1"})
-                    st.rerun()
+            # Le bouton de combat est bloqué en mode 3 (Ville seule)
+            if st.session_state.mode != 3:
+                if st.button("Acheter un Tank de combat (45 Or)", key="btn_action_tank", use_container_width=True):
+                    if st.session_state.argent >= 45:
+                        st.session_state.argent -= 45
+                        st.session_state.unites.append({"type": "Tank v1"})
+                        st.rerun()
+            else:
+                st.write("⚠️ _Option Tank indisponible en Mode Ville Seule_")
                     
             if st.session_state.mode == 5:
                 if st.button("⛏️ Construire Mine de Plutonium (60 Or)", key="btn_action_mine", use_container_width=True):
@@ -130,21 +157,26 @@ elif st.session_state.etape == "PARTIE":
                         st.session_state.argent -= 40
                         st.session_state.inventions.append({"nom": nom_inv, "effet": effet_inv})
                         
-                        # APPEL À L'API GROQ SI LA CLÉ EST CONFIGURÉE
+                        # APPEL À L'API GROQ
                         if client_groq:
                             try:
-                                prompt = f"Dans un jeu de stratégie mondiale, le joueur invente l'unité ou loi '{nom_inv}' avec l'effet suivant : '{effet_inv}'. En tant qu'IA adverse ou conseiller d'État, réponds en deux courtes phrases maximum de manière immersive pour dire comment ton camp réagit stratégiquement ou si cette arme est un danger."
+                                prompt = f"Dans un jeu de stratégie, le joueur crée '{nom_inv}' avec l'effet : '{effet_inv}'. Réponds en deux courtes phrases maximum de manière immersive comme un conseiller d'État pour analyser cette invention."
                                 completion = client_groq.chat.completions.create(
                                     model="llama3-8b-8192",
                                     messages=[{"role": "user", "content": prompt}]
                                 )
-                                st.session_state.reponse_ia = completion.choices[0].message.content
+                                st.session_state.reponse_ia = completion.choices.message.content
                             except Exception as e:
                                 st.session_state.reponse_ia = f"Erreur de connexion à l'IA : {str(e)}"
                         else:
-                            st.session_state.reponse_ia = f"Invention '{nom_inv}' validée ! (Ajoute ta clé API Groq dans les Advanced Settings de Streamlit pour activer les réponses de l'IA)."
+                            st.session_state.reponse_ia = f"Invention '{nom_inv}' enregistrée !"
                         st.rerun()
 
-            if st.button("⏭️ Passer le Tour (Gain +40 Or)", key="btn_passer_tour_global", type="primary", use_container_width=True):
-                st.session_state.argent += 40
+            if st.button("⏭️ Passer le Tour", key="btn_passer_tour_global", type="primary", use_container_width=True):
+                # Calcul de la paye de fin de tour selon les modes
+                gain_de_base = 40
+                if st.session_state.mode == 2: 
+                    gain_de_base += 20 # Bonus automatique en mode guerre (la ville gère son économie seule)
+                
+                st.session_state.argent += gain_de_base
                 st.rerun()
